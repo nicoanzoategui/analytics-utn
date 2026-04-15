@@ -17,6 +17,13 @@ export const authOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user }) {
+      const email = user?.email?.toLowerCase();
+      if (!email || !email.endsWith("@redtecnologica.org")) {
+        return false;
+      }
+      return true;
+    },
     async jwt({ token, account }) {
       if (account) {
         token.accessToken = account.access_token;
