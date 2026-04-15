@@ -9,9 +9,10 @@ export const authOptions = {
       authorization: {
         params: {
           scope: "openid email profile https://www.googleapis.com/auth/analytics.readonly",
-          prompt: "consent",
+          prompt: "select_account consent",
           access_type: "offline",
           response_type: "code",
+          hd: "redtecnologica.org",
         },
       },
     }),
