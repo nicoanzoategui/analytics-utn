@@ -135,8 +135,8 @@ export default function TabResumen({ days, segment, startDate: customStartDate, 
                     loading={loading}
                     info={{
                         title: "Eventos clave",
-                        measure: "Acciones importantes registradas (clicks, descargas, etc).",
-                        calculation: "GA4 → sumatoria de eventos marcados como conversiones"
+                        measure: "Acciones de conversión registradas: inscripciones, compras, contactos por WhatsApp y formularios completados.",
+                        calculation: "GA4 → sumatoria de eventos marcados como conversiones en la propiedad",
                     }}
                 />
             </div>
@@ -148,7 +148,7 @@ export default function TabResumen({ days, segment, startDate: customStartDate, 
                         title="Tasa de nuevos usuarios"
                         measure="Relación entre usuarios que entran por primera vez y el total."
                         calculation="(newUsers / activeUsers) × 100"
-                        interpretation=">80% = fuerte adquisición | <30% = base de usuarios consolidada"
+                        interpretation=">70% = fuerte adquisición | 40-70% = crecimiento mixto | <40% = base consolidada"
                     />
                     <div className="flex items-center space-x-4 mb-6">
                         <div className="p-3 bg-gray-50 rounded-2xl">
@@ -173,8 +173,8 @@ export default function TabResumen({ days, segment, startDate: customStartDate, 
                             </div>
                         </div>
                         <div className="flex flex-col justify-center">
-                            <div className={`text-xs font-black uppercase tracking-widest ${resumen?.newUsersRate?.value > 80 ? 'text-black' : 'text-gray-400'}`}>
-                                {loading ? "" : (resumen?.newUsersRate?.value > 80 ? "Fuerte Adquisición" : "Base Consolidada")}
+                            <div className={`text-xs font-black uppercase tracking-widest ${resumen?.newUsersRate?.value > 70 ? "text-black" : "text-gray-400"}`}>
+                                {loading ? "" : (resumen?.newUsersRate?.value > 70 ? "Fuerte adquisición" : resumen?.newUsersRate?.value > 40 ? "Crecimiento mixto" : "Base consolidada")}
                             </div>
                             <p className="text-[10px] text-gray-400 mt-1">Status del crecimiento</p>
                         </div>
@@ -183,46 +183,29 @@ export default function TabResumen({ days, segment, startDate: customStartDate, 
 
                 <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative group overflow-hidden">
                     <InfoTooltip 
-                        title="Engagement score"
-                        measure="Puntuación compuesta de la intensidad de uso de la plataforma."
-                        calculation="Promedio ponderado: (views/user × 0.4) + (avgDuration × 0.6), normalizado."
+                        title="Tasa de engagement"
+                        measure="Porcentaje de sesiones donde el usuario interactuó activamente (mínimo 10 segundos, 2 páginas o conversión)."
+                        calculation="GA4 → engagementRate × 100"
                     />
                     <div className="flex items-center space-x-4 mb-6">
                         <div className="p-3 bg-gray-50 rounded-2xl">
                             <Target className="w-6 h-6 text-black" />
                         </div>
                         <div>
-                            <h3 className="chart-title">Engagement score</h3>
-                            <p className="text-gray-400 text-xs">Intensidad de uso (0-100)</p>
+                            <h3 className="chart-title">Tasa de engagement</h3>
+                            <p className="text-gray-400 text-xs">Sesiones con interacción real</p>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-8">
-                        <div>
-                            <div className="text-4xl font-black text-black tracking-tighter mb-1">
-                                {loading ? "..." : `${resumen?.engagementScore?.value}`}
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${resumen?.engagementScore?.value >= (resumen?.engagementScore?.prevValue || 0) ? "bg-black text-white" : "bg-gray-100 text-gray-500"}`}>
-                                    {resumen?.engagementScore?.value >= (resumen?.engagementScore?.prevValue || 0) ? "+" : ""}{(resumen?.engagementScore?.value - (resumen?.engagementScore?.prevValue || 0)).toFixed(1)}%
-                                </span>
-                                <span className="text-[10px] text-gray-400 font-medium">vs prev.</span>
-                            </div>
+                    <div>
+                        <div className="text-4xl font-black text-black tracking-tighter mb-1">
+                            {loading ? "..." : `${resumen?.engagementRate?.value ?? 0}%`}
                         </div>
-                        <div className="flex flex-col justify-center">
-                            <div className="flex items-center space-x-2 mb-1">
-                                {loading ? null : (
-                                    <>
-                                        <div className={`h-1.5 flex-1 rounded-full bg-gray-100 overflow-hidden`}>
-                                            <div className="h-full bg-black transition-all duration-1000" style={{ width: `${resumen?.engagementScore?.value}%` }} />
-                                        </div>
-                                        <span className="text-[10px] font-black text-black">{resumen?.engagementScore?.value}</span>
-                                    </>
-                                )}
-                            </div>
-                            <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-1">
-                                {resumen?.engagementScore?.value >= 70 ? "Excelente" : resumen?.engagementScore?.value >= 40 ? "Promedio" : "Bajo"}
-                            </div>
+                        <div className="flex items-center space-x-2">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${(resumen?.engagementRate?.value ?? 0) >= (resumen?.engagementRate?.prevValue || 0) ? "bg-black text-white" : "bg-gray-100 text-gray-500"}`}>
+                                {(resumen?.engagementRate?.value ?? 0) >= (resumen?.engagementRate?.prevValue || 0) ? "+" : ""}{((resumen?.engagementRate?.value ?? 0) - (resumen?.engagementRate?.prevValue || 0)).toFixed(1)}%
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-medium">vs prev.</span>
                         </div>
                     </div>
                 </div>

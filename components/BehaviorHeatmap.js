@@ -10,12 +10,12 @@ export default function BehaviorHeatmap({ data, loading }) {
 
     // Grid data map: dayIndex -> hour -> count
     const grid = data.reduce((acc, item) => {
-        if (!acc[item.dayOfWeek]) acc[item.dayOfWeek] = {};
-        acc[item.dayOfWeek][item.hour] = item.users || item.activeUsers;
+        if (!acc[item.day]) acc[item.day] = {};
+        acc[item.day][item.hour] = item.users;
         return acc;
     }, {});
 
-    const maxUsers = Math.max(...data.map(d => d.users || d.activeUsers), 1);
+    const maxUsers = Math.max(...data.map((d) => d.users), 1);
 
     return (
         <div className="overflow-x-auto pb-4 custom-scrollbar">
@@ -45,7 +45,7 @@ export default function BehaviorHeatmap({ data, loading }) {
                                         title={`${day} ${hour}h: ${val} usuarios`}
                                         className="h-8 flex-1 rounded-sm transition-colors duration-300"
                                         style={{
-                                            backgroundColor: val === 0 ? '#fafafa' : `rgba(0, 0, 0, ${0.1 + alpha * 0.9})`
+                                            backgroundColor: val === 0 ? '#f1f5f9' : `rgba(37, 99, 235, ${0.1 + alpha * 0.9})`
                                         }}
                                     />
                                 );
@@ -58,7 +58,7 @@ export default function BehaviorHeatmap({ data, loading }) {
                 <span className="text-[10px] text-gray-400 lowercase">Menos actividad</span>
                 <div className="flex space-x-1">
                     {[0.1, 0.4, 0.7, 1].map(o => (
-                        <div key={o} className="w-3 h-3 rounded-sm bg-black" style={{ opacity: o }} />
+                        <div key={o} className="w-3 h-3 rounded-sm bg-blue-600" style={{ opacity: o }} />
                     ))}
                 </div>
                 <span className="text-[10px] text-gray-400 lowercase">Más actividad</span>

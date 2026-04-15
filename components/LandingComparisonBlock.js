@@ -1,23 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { 
-    AlertCircle, 
-    TrendingUp, 
-    TrendingDown, 
-    Target,
-} from "lucide-react";
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    ReferenceLine,
-    Cell
-} from "recharts";
+    AlertCircle,
+    TrendingUp,
+    TrendingDown,
+    Target,
+    FileText,
+    MessageCircle,
+} from "lucide-react";
 import InfoTooltip from "@/components/InfoTooltip";
 
 export default function LandingComparisonBlock({ segment }) {
@@ -40,7 +31,6 @@ export default function LandingComparisonBlock({ segment }) {
     });
 
     const [comparisonData, setComparisonData] = useState(null);
-    const [timelineData, setTimelineData] = useState([]);
 
     const fetchData = useCallback(async () => {
         if (segment === "panel" || !cutoffDate) return;
@@ -59,20 +49,17 @@ export default function LandingComparisonBlock({ segment }) {
                 params += `&daysBefore=${periodOption}&daysAfter=${periodOption}`;
             }
 
-            const [resComp, resTimeline] = await Promise.all([
-                fetch(`/api/analytics/landing-comparacion${params}`),
-                fetch(`/api/analytics/landing-timeline${params}`)
-            ]);
+            const resComp = await fetch(
+                `/api/analytics/landing-comparacion${params}`,
+            );
 
-            if (!resComp.ok || !resTimeline.ok) {
+            if (!resComp.ok) {
                 throw new Error("Error al cargar datos de conversión");
             }
 
             const dataComp = await resComp.json();
-            const dataTimeline = await resTimeline.json();
 
             setComparisonData(dataComp);
-            setTimelineData(dataTimeline);
         } catch (err) {
             console.error(err);
             setError(err.message);
@@ -117,10 +104,11 @@ export default function LandingComparisonBlock({ segment }) {
 
     const isNewWinner = comparisonData && (comparisonData.new?.conversion > (comparisonData.old?.conversion || 0));
 
-    // Dynamic Max for Chart
-    const maxVal = timelineData.length > 0 
-        ? Math.max(...timelineData.map(d => d.conversionRate || 0)) * 1.2 
-        : 10;
+    const partialConversionPct = (clicks, users) => {
+        const u = Number(users) || 0;
+        if (u <= 0) return "0.0%";
+        return `${(((Number(clicks) || 0) / u) * 100).toFixed(1)}%`;
+    };
 
     return (
         <div className="space-y-2 pt-4 border-t border-gray-100 relative">
@@ -130,9 +118,9 @@ export default function LandingComparisonBlock({ segment }) {
                     Landing de Carreras
                 </h2>
                 <InfoTooltip 
-                    title="Análisis: Landing Vieja vs Nueva"
-                    measure="Compara el rendimiento de la landing vieja vs la nueva en tráfico y conversión a inscripción, separadas por una fecha de corte definida manualmente."
-                    calculation="page_view → llegada a carrera | click_inscription → click inscripción | Cálculo: (clicks / views) × 100. Filtro URL: /e-learning/detalle/carrera/"
+                    title="Análisis: Landing Anterior vs Nueva"
+                    measure="Compara el rendimiento de la landing anterior vs la nueva en tráfico y conversión a inscripción, separadas por una fecha de corte definida manualmente."
+                    calculation="page_view → llegada a carrera | click_inscription + chatbot_open_whatsapp | Cálculo: ((inscripción + WhatsApp) / usuarios únicos activos) × 100. Filtro URL: /e-learning/detalle/carrera/"
                 />
             </div>
 
@@ -178,7 +166,7 @@ export default function LandingComparisonBlock({ segment }) {
                     )}
                 </div>
                 <p className="text-[11px] text-gray-400 mt-2 italic font-medium">
-                    Comparando: <span className="text-gray-600 font-bold">{formatDateRange(comparisonData?.old?.range)}</span> (vieja) vs <span className="text-gray-600 font-bold">{formatDateRange(comparisonData?.new?.range)}</span> (nueva)
+                    Comparando: <span className="text-gray-600 font-bold">{formatDateRange(comparisonData?.old?.range)}</span> (anterior) vs <span className="text-gray-600 font-bold">{formatDateRange(comparisonData?.new?.range)}</span> (nueva)
                 </p>
             </div>
 
@@ -191,17 +179,65 @@ export default function LandingComparisonBlock({ segment }) {
                         </div>
                     )}
                     <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-300 mb-2">Landing Nueva</h4>
-                    <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
                         <div>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">Visitas</p>
-                            <p className="text-[20px] font-black leading-tight text-black">{comparisonData?.new?.views.toLocaleString() || 0}</p>
+                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">
+                                Usuarios únicos
+                            </p>
+                            <p className="text-[20px] font-black leading-tight text-black">
+                                {(comparisonData?.new?.users ?? 0).toLocaleString()}
+                            </p>
                         </div>
                         <div>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">Clicks</p>
-                            <p className="text-[20px] font-black leading-tight text-black">{comparisonData?.new?.clicks.toLocaleString() || 0}</p>
+                            <p className="flex items-center justify-center gap-0.5 text-[10px] uppercase font-bold text-gray-400 tracking-tight">
+                                <FileText className="w-3 h-3 shrink-0" aria-hidden />
+                                Inscripción
+                            </p>
+                            <p className="text-[20px] font-black leading-tight text-black">
+                                {(
+                                    comparisonData?.new?.clicks_inscription ?? 0
+                                ).toLocaleString()}
+                            </p>
+                            <p className="text-[9px] text-gray-400 leading-tight mt-0.5 px-0.5">
+                                Conv. inscripción:{" "}
+                                {partialConversionPct(
+                                    comparisonData?.new?.clicks_inscription,
+                                    comparisonData?.new?.users,
+                                )}
+                            </p>
                         </div>
                         <div>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">Conv</p>
+                            <p className="flex items-center justify-center gap-0.5 text-[10px] uppercase font-bold text-gray-400 tracking-tight">
+                                <MessageCircle
+                                    className="w-3 h-3 shrink-0"
+                                    aria-hidden
+                                />
+                                WhatsApp
+                            </p>
+                            <p className="text-[20px] font-black leading-tight text-black">
+                                {(
+                                    comparisonData?.new?.clicks_whatsapp ?? 0
+                                ).toLocaleString()}
+                            </p>
+                            <p className="text-[9px] text-gray-400 leading-tight mt-0.5 px-0.5">
+                                Conv. WhatsApp:{" "}
+                                {partialConversionPct(
+                                    comparisonData?.new?.clicks_whatsapp,
+                                    comparisonData?.new?.users,
+                                )}
+                            </p>
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-center gap-0.5 mb-0.5">
+                                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">
+                                    Conv
+                                </p>
+                                <InfoTooltip
+                                    title="Conversión"
+                                    measure="% de usuarios únicos con click en Inscribirse o en WhatsApp (chatbot)"
+                                    calculation="((click_inscription + chatbot_open_whatsapp) / usuarios únicos en la landing) × 100"
+                                />
+                            </div>
                             <p className={`text-[20px] font-black leading-tight ${isNewWinner ? 'text-green-600' : 'text-black'}`}>{comparisonData?.new?.conversion.toFixed(1) || "0.0"}%</p>
                         </div>
                         <div>
@@ -217,18 +253,66 @@ export default function LandingComparisonBlock({ segment }) {
                             Convierte más
                         </div>
                     )}
-                    <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-300 mb-2">Landing Vieja</h4>
-                    <div className="grid grid-cols-4 gap-2 text-center">
+                    <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-300 mb-2">Landing Anterior</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
                         <div>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">Visitas</p>
-                            <p className="text-[20px] font-black leading-tight text-black">{comparisonData?.old?.views.toLocaleString() || 0}</p>
+                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">
+                                Usuarios únicos
+                            </p>
+                            <p className="text-[20px] font-black leading-tight text-black">
+                                {(comparisonData?.old?.users ?? 0).toLocaleString()}
+                            </p>
                         </div>
                         <div>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">Clicks</p>
-                            <p className="text-[20px] font-black leading-tight text-black">{comparisonData?.old?.clicks.toLocaleString() || 0}</p>
+                            <p className="flex items-center justify-center gap-0.5 text-[10px] uppercase font-bold text-gray-400 tracking-tight">
+                                <FileText className="w-3 h-3 shrink-0" aria-hidden />
+                                Inscripción
+                            </p>
+                            <p className="text-[20px] font-black leading-tight text-black">
+                                {(
+                                    comparisonData?.old?.clicks_inscription ?? 0
+                                ).toLocaleString()}
+                            </p>
+                            <p className="text-[9px] text-gray-400 leading-tight mt-0.5 px-0.5">
+                                Conv. inscripción:{" "}
+                                {partialConversionPct(
+                                    comparisonData?.old?.clicks_inscription,
+                                    comparisonData?.old?.users,
+                                )}
+                            </p>
                         </div>
                         <div>
-                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">Conv</p>
+                            <p className="flex items-center justify-center gap-0.5 text-[10px] uppercase font-bold text-gray-400 tracking-tight">
+                                <MessageCircle
+                                    className="w-3 h-3 shrink-0"
+                                    aria-hidden
+                                />
+                                WhatsApp
+                            </p>
+                            <p className="text-[20px] font-black leading-tight text-black">
+                                {(
+                                    comparisonData?.old?.clicks_whatsapp ?? 0
+                                ).toLocaleString()}
+                            </p>
+                            <p className="text-[9px] text-gray-400 leading-tight mt-0.5 px-0.5">
+                                Conv. WhatsApp:{" "}
+                                {partialConversionPct(
+                                    comparisonData?.old?.clicks_whatsapp,
+                                    comparisonData?.old?.users,
+                                )}
+                            </p>
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-center gap-0.5 mb-0.5">
+                                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tight">
+                                    Conv
+                                </p>
+                                <InfoTooltip
+                                    title="Conversión"
+                                    measure="% de usuarios únicos con click en Inscribirse o en WhatsApp (chatbot)"
+                                    calculation="((click_inscription + chatbot_open_whatsapp) / usuarios únicos en la landing) × 100"
+                                />
+                            </div>
                             <p className={`text-[20px] font-black leading-tight ${!isNewWinner && (comparisonData?.old?.conversion || 0) > 0 ? 'text-green-600' : 'text-black'}`}>{comparisonData?.old?.conversion.toFixed(1) || "0.0"}%</p>
                         </div>
                         <div>
@@ -238,68 +322,6 @@ export default function LandingComparisonBlock({ segment }) {
                     </div>
                 </div>
             </div>
-
-            {/* Compact Daily Conversion Chart */}
-            <section className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs">
-                <div className="flex items-center justify-between mb-4">
-                    <p className="text-[10px] font-black text-black uppercase tracking-widest">Tasa de conversión diaria (%)</p>
-                </div>
-
-                <div className="h-[100px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={timelineData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                            <XAxis 
-                                dataKey="date" 
-                                hide={false}
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fill: "#9CA3AF", fontSize: 8, fontWeight: 700 }}
-                                tickFormatter={(val) => {
-                                    const d = new Date(val);
-                                    return `${d.getDate()}/${d.getMonth() + 1}`;
-                                }}
-                            />
-                            <YAxis 
-                                axisLine={false}
-                                tickLine={false}
-                                domain={[0, maxVal]}
-                                tick={{ fill: "#9CA3AF", fontSize: 8, fontWeight: 700 }}
-                                tickFormatter={(val) => `${val}%`}
-                            />
-                            <Tooltip 
-                                cursor={{fill: 'transparent'}}
-                                contentStyle={{
-                                    backgroundColor: "#fff",
-                                    border: "none",
-                                    borderRadius: "8px",
-                                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                                    fontSize: "10px",
-                                    padding: "8px"
-                                }}
-                                formatter={(value) => [`${value.toFixed(2)}%`, 'Conversión']}
-                            />
-                            <Bar 
-                                dataKey="conversionRate" 
-                                radius={[2, 2, 0, 0]}
-                                animationDuration={1000}
-                            >
-                                {timelineData.map((entry, index) => (
-                                    <Cell 
-                                        key={`cell-${index}`} 
-                                        fill={new Date(entry.date) >= new Date(cutoffDate) ? "#2563EB" : "#E5E7EB"} 
-                                    />
-                                ))}
-                            </Bar>
-                            <ReferenceLine 
-                                x={cutoffDate} 
-                                stroke="#9CA3AF" 
-                                strokeDasharray="3 3" 
-                            />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </section>
 
             {/* Compact Summary Result */}
             <div className={`p-4 rounded-2xl border ${isNewWinner ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'} flex items-center justify-between transition-all duration-300`}>
@@ -312,7 +334,7 @@ export default function LandingComparisonBlock({ segment }) {
                             {isNewWinner ? '+' : ''}{diffPoints} ptos porcentuales
                         </p>
                         <p className={`text-[11px] ${isNewWinner ? 'text-green-700' : 'text-red-700'} font-bold opacity-80 uppercase tracking-tight`}>
-                            {isNewWinner ? `LA LANDING NUEVA CONVIERTE UN ${diffPercent}% MÁS` : `LA LANDING VIEJA CONVIERTE UN ${Math.abs(diffPercent)}% MÁS`}
+                            {isNewWinner ? `LA LANDING NUEVA CONVIERTE UN ${diffPercent}% MÁS` : `LA LANDING ANTERIOR CONVIERTE UN ${Math.abs(diffPercent)}% MÁS`}
                         </p>
                     </div>
                 </div>

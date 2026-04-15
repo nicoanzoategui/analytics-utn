@@ -41,9 +41,16 @@ export async function GET(request) {
         const rows = response.rows || [];
         console.log(`[Resumen API] GA4 response rows length: ${rows.length}`);
 
+        const currentRows = rows.filter((row) =>
+            row.dimensionValues?.some((d) => d.value === "date_range_0")
+        );
+        const previousRows = rows.filter((row) =>
+            row.dimensionValues?.some((d) => d.value === "date_range_1")
+        );
+
         const defaultMetricValues = Array(6).fill({ value: "0" });
-        const currentM = rows.length > 0 ? rows[0].metricValues : defaultMetricValues;
-        const previousM = rows.length > 1 ? rows[1].metricValues : defaultMetricValues;
+        const currentM = currentRows[0]?.metricValues ?? defaultMetricValues;
+        const previousM = previousRows[0]?.metricValues ?? defaultMetricValues;
 
         const parseMetrics = (metricValues) => {
             const activeUsers = parseInt(metricValues[0]?.value || "0");
@@ -54,14 +61,12 @@ export async function GET(request) {
             const pvPerSession = parseFloat(metricValues[5]?.value || "0");
 
             const newUsersRate = activeUsers > 0 ? (newUsers / activeUsers) * 100 : 0;
-            const score = (engRate * 40) +
-                (Math.min(avgDuration / 300, 1) * 30) +
-                (Math.min(pvPerSession / 5, 1) * 30);
+            const engagementRate = Math.round(engRate * 100);
 
             return {
                 activeUsers, newUsers, avgSessionDuration: avgDuration,
-                keyEvents, engagementRate: engRate, screenPageViewsPerSession: pvPerSession,
-                newUsersRate, engagementScore: Math.round(score)
+                keyEvents, engagementRate, screenPageViewsPerSession: pvPerSession,
+                newUsersRate,
             };
         };
 
@@ -75,7 +80,6 @@ export async function GET(request) {
             keyEvents: { value: currentData.keyEvents, prevValue: prevData.keyEvents },
             engagementRate: { value: currentData.engagementRate, prevValue: prevData.engagementRate },
             newUsersRate: { value: currentData.newUsersRate, prevValue: prevData.newUsersRate },
-            engagementScore: { value: currentData.engagementScore, prevValue: prevData.engagementScore },
         };
 
         return NextResponse.json(data);

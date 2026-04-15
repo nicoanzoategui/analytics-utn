@@ -37,11 +37,12 @@ export async function GET(request) {
 
         const rows = response.rows || [];
         const data = rows.map((row) => ({
-            page: row.dimensionValues[0].value,
-            views: parseInt(row.metricValues[0].value),
-            users: parseInt(row.metricValues[1].value),
+            pageTitle: row.dimensionValues[0].value,
+            pagePath: row.dimensionValues[0].value,
+            screenPageViews: parseInt(row.metricValues[0].value),
+            activeUsers: parseInt(row.metricValues[1].value),
+            averageSessionDuration: parseFloat(row.metricValues[3].value),
             engagementRate: parseFloat(row.metricValues[2].value),
-            avgDuration: parseFloat(row.metricValues[3].value),
             bounceRate: parseFloat(row.metricValues[4].value),
             conversions: parseInt(row.metricValues[5].value),
         }));

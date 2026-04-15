@@ -34,10 +34,10 @@ export async function GET(request) {
 
         const rows = response.rows || [];
         const data = rows.map((row) => ({
-            page: row.dimensionValues[0].value,
-            users: parseInt(row.metricValues[0].value),
+            name: row.dimensionValues[0].value,
+            views: parseInt(row.metricValues[0].value),
+            duration: parseFloat(row.metricValues[2].value),
             engagementRate: parseFloat(row.metricValues[1].value),
-            avgDuration: parseFloat(row.metricValues[2].value),
         }));
 
         return NextResponse.json(data);

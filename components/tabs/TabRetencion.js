@@ -1,60 +1,98 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import RetentionAcquisitionChart from "@/components/RetentionAcquisitionChart";
-import TrafficSourcesBarChart from "@/components/TrafficSourcesBarChart";
-import SourceEngagementTable from "@/components/SourceEngagementTable";
-import CountryDistributionTable from "@/components/CountryDistributionTable";
-import { AlertCircle, Repeat, Share2, Globe, ArrowRight } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { AlertCircle, Repeat, Share2, BarChart3 } from "lucide-react";
 import InfoTooltip from "@/components/InfoTooltip";
 
+const SOURCE_LABELS = {
+    "(direct)": "Directo",
+    "(not set)": "Sin fuente",
+    sfmc: "Email Marketing (Salesforce)",
+    "frch.utn.edu.ar": "Portal UTN",
+    "l.instagram.com": "Instagram",
+    "ar.search.yahoo.com": "Yahoo",
+    "chatgpt.com": "ChatGPT",
+};
 
-export default function TabRetencion({ days, segment, startDate: customStartDate, endDate: customEndDate }) {
+function cleanSourceName(name) {
+    if (!name || typeof name !== "string") return "Sin fuente";
+    const key = name.trim().toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(SOURCE_LABELS, key)) {
+        return SOURCE_LABELS[key];
+    }
+    return name.trim();
+}
+
+function formatDuration(seconds) {
+    const s = Number(seconds) || 0;
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function engagementPct(rate) {
+    const r = Number(rate) || 0;
+    return r <= 1 ? r * 100 : r;
+}
+
+function engagementBadge(rate) {
+    const pct = engagementPct(rate);
+    if (pct >= 70) {
+        return { label: "Alto", className: "bg-green-50 text-green-700" };
+    }
+    if (pct >= 50) {
+        return { label: "Medio", className: "bg-yellow-50 text-yellow-700" };
+    }
+    return { label: "Bajo", className: "bg-red-50 text-red-700" };
+}
+
+export default function TabRetencion({
+    days,
+    segment,
+    startDate: customStartDate,
+    endDate: customEndDate,
+}) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const [retentionData, setRetentionData] = useState(null);
-    const [sourcesData, setSourcesData] = useState([]);
+    const [retentionData, setRetentionData] = useState([]);
     const [engagementData, setEngagementData] = useState([]);
-    const [countriesData, setCountriesData] = useState([]);
-    const [conversionData, setConversionData] = useState(null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
             const baseUrl = `/api/analytics`;
-            const dateParams = customStartDate && customEndDate 
-                ? `startDate=${customStartDate}&endDate=${customEndDate}`
-                : `days=${days}`;
+            const dateParams =
+                customStartDate && customEndDate
+                    ? `startDate=${customStartDate}&endDate=${customEndDate}`
+                    : `days=${days}`;
             const params = `?${dateParams}&segment=${segment}`;
 
-            const requests = [
+            const [resRet, resFuentes, resEng] = await Promise.all([
                 fetch(`${baseUrl}/retencion${params}`),
                 fetch(`${baseUrl}/fuentes${params}`),
                 fetch(`${baseUrl}/fuentes-engagement${params}`),
-                fetch(`${baseUrl}/paises${params}`),
-            ];
+            ]);
 
-            if (segment === "all") {
-                requests.push(fetch(`${baseUrl}/conversion?${dateParams}`));
-            }
-
-            const responses = await Promise.all(requests);
-
-            if (responses.some(res => !res.ok)) {
+            if (!resRet.ok || !resFuentes.ok || !resEng.ok) {
                 throw new Error("Error al cargar datos de retención");
             }
 
-            const jsonData = await Promise.all(responses.map(res => res.json()));
+            const [dataRet, , dataEng] = await Promise.all([
+                resRet.json(),
+                resFuentes.json(),
+                resEng.json(),
+            ]);
 
-            setRetentionData(jsonData[0]);
-            setSourcesData(jsonData[1]);
-            setEngagementData(jsonData[2]);
-            setCountriesData(jsonData[3]);
-            if (segment === "all") {
-                setConversionData(jsonData[4]);
-            }
+            const timeline = Array.isArray(dataRet)
+                ? dataRet
+                : dataRet?.timeline && Array.isArray(dataRet.timeline)
+                  ? dataRet.timeline
+                  : [];
+
+            setRetentionData(timeline);
+            setEngagementData(Array.isArray(dataEng) ? dataEng : []);
         } catch (err) {
             console.error(err);
             setError(err.message);
@@ -63,16 +101,83 @@ export default function TabRetencion({ days, segment, startDate: customStartDate
         }
     }, [days, segment, customStartDate, customEndDate]);
 
-
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    const retentionStats = useMemo(() => {
+        const timeline = retentionData || [];
+        const totalActive = timeline.reduce(
+            (s, d) => s + (Number(d.activeUsers) || 0),
+            0,
+        );
+        const totalNew = timeline.reduce(
+            (s, d) => s + (Number(d.newUsers) || 0),
+            0,
+        );
+        const totalReturning = totalActive - totalNew;
+        const retentionRate =
+            totalActive > 0
+                ? Math.round((totalReturning / totalActive) * 100)
+                : 0;
+        const newPct =
+            totalActive > 0
+                ? ((totalNew / totalActive) * 100).toFixed(1)
+                : "0.0";
+        return {
+            totalActive,
+            totalNew,
+            totalReturning,
+            retentionRate,
+            newPct,
+        };
+    }, [retentionData]);
+
+    const trafficByUsers = useMemo(() => {
+        const list = (engagementData || []).map((row) => ({
+            ...row,
+            label: cleanSourceName(row.source),
+            users: Number(row.users) || 0,
+        }));
+        return [...list].sort((a, b) => b.users - a.users).slice(0, 10);
+    }, [engagementData]);
+
+    const maxTrafficUsers = Math.max(
+        ...trafficByUsers.map((r) => r.users),
+        1,
+    );
+
+    const engagementSorted = useMemo(() => {
+        return [...(engagementData || [])]
+            .map((row) => ({
+                ...row,
+                label: cleanSourceName(row.source),
+            }))
+            .sort(
+                (a, b) =>
+                    engagementPct(b.engagementRate) -
+                    engagementPct(a.engagementRate),
+            );
+    }, [engagementData]);
+
+    const interpretRetention = () => {
+        const r = retentionStats.retentionRate;
+        if (r > 40) {
+            return "Base consolidada — más del 40% de usuarios vuelve";
+        }
+        if (r > 20) {
+            return "Retención moderada — hay oportunidad de mejorar";
+        }
+        return "Mayoría de tráfico nuevo — foco en adquisición";
+    };
 
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center py-12 bg-white rounded-xl border border-red-100 text-center">
                 <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
-                <h3 className="text-lg font-bold text-black mb-2">Error en Retención</h3>
+                <h3 className="text-lg font-bold text-black mb-2">
+                    Error en Retención
+                </h3>
                 <p className="text-gray-500">{error}</p>
             </div>
         );
@@ -80,113 +185,225 @@ export default function TabRetencion({ days, segment, startDate: customStartDate
 
     return (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
-            {/* Conversion Card (Only for All segment) */}
-            {segment === "all" && conversionData && (
-                <section className="bg-black text-white p-8 rounded-3xl border border-gray-800 shadow-xl overflow-hidden relative group">
-                    <InfoTooltip 
-                        title="Conversión web → panel"
-                        measure="Qué % de visitantes de la web pública terminan entrando al panel."
-                        calculation="(usuarios con segment=panel / usuarios con segment=public) × 100"
-                    />
-                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <ArrowRight className="w-32 h-32 -rotate-45" />
-                    </div>
-                    <div className="relative z-10">
-                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-4">Conversión Cross-Segment</p>
-                        <div className="flex flex-col md:flex-row md:items-end gap-6">
-                            <div>
-                                <h3 className="text-5xl font-bold tracking-tighter mb-2">
-                                    {conversionData.conversionRate}%
-                                </h3>
-                                <p className="text-gray-400 text-sm max-w-md">
-                                    de visitantes de la <span className="text-white font-medium">web pública</span> terminaron entrando al <span className="text-white font-medium">panel del alumno</span> en este período.
-                                </p>
-                            </div>
-                            <div className="flex gap-8 border-l border-gray-800 pl-8 h-fit self-center md:self-end">
-                                <div>
-                                    <p className="text-gray-500 text-[10px] uppercase font-bold mb-1">Web Pública</p>
-                                    <p className="text-xl font-bold">{new Intl.NumberFormat().format(conversionData.publicUsers)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-gray-500 text-[10px] uppercase font-bold mb-1">Panel</p>
-                                    <p className="text-xl font-bold">{new Intl.NumberFormat().format(conversionData.panelUsers)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            )}
-
-            {/* Retention vs Acquisition Section */}
+            {/* SECCIÓN 1 — Nuevos vs Recurrentes */}
             <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative">
-                <InfoTooltip 
-                    title="Retención vs adquisición (gráfico)"
-                    measure="Si la plataforma crece por retención o por nuevos usuarios constantemente. Incluye el Índice de Retención."
-                    calculation="GA4 → activeUsers vs newUsers por fecha. Índice = activeUsers / newUsers (acumulado)."
-                    interpretation=">1.5 = muy buena | 1.1-1.5 = moderada | <1.1 = baja retención"
+                <InfoTooltip
+                    title="Nuevos vs recurrentes"
+                    measure="Suma diaria de usuarios activos y nuevos en el período (no son usuarios únicos globales del período)."
+                    calculation="Recurrentes = Σ activeUsers − Σ newUsers. Tasa de retorno = recurrentes / activos × 100."
                 />
                 <div className="flex items-center space-x-3 mb-8">
                     <div className="p-2 bg-gray-50 rounded-lg">
                         <Repeat className="w-5 h-5 text-black" />
                     </div>
                     <div>
-                        <h3 className="chart-title">Retención vs Adquisición</h3>
-                        <p className="text-gray-400 text-xs text-balance">Comparativa de usuarios nuevos vs recurrentes</p>
+                        <h3 className="chart-title">Nuevos vs Recurrentes</h3>
+                        <p className="text-gray-400 text-xs text-balance">
+                            Distribución del tráfico entre primera visita y
+                            usuarios que vuelven
+                        </p>
                     </div>
                 </div>
-                <RetentionAcquisitionChart
-                    data={retentionData?.timeline || []}
-                    ratio={retentionData?.retentionIndex}
-                    loading={loading}
-                />
+
+                {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="h-36 bg-gray-50 animate-pulse rounded-2xl" />
+                        <div className="h-36 bg-gray-50 animate-pulse rounded-2xl" />
+                    </div>
+                ) : retentionStats.totalActive === 0 ? (
+                    <p className="text-sm text-gray-400">
+                        Sin datos de retención para este período
+                    </p>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                                    Usuarios nuevos
+                                </p>
+                                <p className="text-4xl font-black tabular-nums text-black leading-none mb-2">
+                                    {retentionStats.totalNew.toLocaleString()}
+                                </p>
+                                <p className="text-sm font-bold text-gray-600 mb-1">
+                                    {retentionStats.newPct}%
+                                </p>
+                                <p className="text-xs text-gray-400 font-medium">
+                                    Primer visita
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                                    Usuarios recurrentes
+                                </p>
+                                <p className="text-4xl font-black tabular-nums text-black leading-none mb-2">
+                                    {retentionStats.totalReturning.toLocaleString()}
+                                </p>
+                                <p className="text-sm font-bold text-gray-600 mb-1">
+                                    {retentionStats.retentionRate}%
+                                </p>
+                                <p className="text-xs text-gray-400 font-medium">
+                                    Volvieron a la plataforma
+                                </p>
+                            </div>
+                        </div>
+                        <p className="mt-6 text-sm text-gray-600 font-medium leading-relaxed">
+                            {interpretRetention()}
+                        </p>
+                    </>
+                )}
             </section>
 
-            {/* Sources Logic */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative">
-                    <InfoTooltip 
-                        title="Fuentes de tráfico (barras)"
-                        measure="Por qué canal llegan los usuarios a la plataforma."
-                        calculation="GA4 → sessions agrupadas por sessionDefaultChannelGroup"
-                    />
-                    <div className="flex items-center space-x-3 mb-8">
-                        <div className="p-2 bg-gray-50 rounded-lg">
-                            <Share2 className="w-5 h-5 text-black" />
-                        </div>
-                        <h3 className="chart-title">Fuentes de tráfico</h3>
-                    </div>
-                    <TrafficSourcesBarChart data={sourcesData} loading={loading} />
-                </section>
-
-                <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative">
-                    <InfoTooltip 
-                        title="Usuarios por país (tabla)"
-                        measure="Distribución geográfica de los usuarios."
-                        calculation="GA4 → activeUsers agrupado por dimensión country"
-                    />
-                    <div className="flex items-center space-x-3 mb-8">
-                        <div className="p-2 bg-gray-50 rounded-lg">
-                            <Globe className="w-5 h-5 text-black" />
-                        </div>
-                        <h3 className="chart-title">Usuarios por país</h3>
-                    </div>
-                    <CountryDistributionTable data={countriesData} loading={loading} />
-                </section>
-            </div>
-
-            {/* Engagement Table */}
+            {/* SECCIÓN 2 — Fuentes de tráfico (barras) */}
             <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative">
-                <InfoTooltip 
-                    title="Fuentes vs engagement (tabla)"
-                    measure="Qué fuente de tráfico trae usuarios más comprometidos."
-                    calculation="GA4 → sessions, averageSessionDuration, engagementRate agrupados por channel"
+                <InfoTooltip
+                    title="Fuentes de tráfico"
+                    measure="Canales de adquisición con más usuarios activos."
+                    calculation="GA4: activeUsers por sessionSource (top 10)."
                 />
-                <h3 className="text-xl font-bold text-black mb-1">Fuente vs Engagement</h3>
-                <p className="text-gray-400 text-xs mb-8">Rendimiento detallado por canal de adquisición</p>
-                <SourceEngagementTable data={engagementData} loading={loading} />
+                <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-2 bg-gray-50 rounded-lg">
+                        <Share2 className="w-5 h-5 text-black" />
+                    </div>
+                    <div>
+                        <h3 className="chart-title mb-1">
+                            De dónde viene el tráfico
+                        </h3>
+                        <p className="text-gray-400 text-xs mb-6">
+                            Top 10 fuentes por usuarios activos
+                        </p>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="h-40 bg-gray-50 animate-pulse rounded-xl" />
+                ) : trafficByUsers.length === 0 ? (
+                    <p className="text-sm text-gray-400">
+                        Sin datos de fuentes para este período
+                    </p>
+                ) : (
+                    <ul className="space-y-4">
+                        {trafficByUsers.map((item, idx) => {
+                            const opacity =
+                                maxTrafficUsers > 0
+                                    ? 0.2 +
+                                      (item.users / maxTrafficUsers) * 0.8
+                                    : 0.2;
+                            return (
+                                <li
+                                    key={`src-${item.source}-${idx}`}
+                                    className="flex flex-col gap-2"
+                                >
+                                    <span className="text-sm font-medium text-black break-words">
+                                        {item.label}
+                                    </span>
+                                    <div className="flex items-center gap-3 w-full min-w-0">
+                                        <div className="flex-1 min-w-0 h-8 rounded-md bg-[#f1f5f9] overflow-hidden">
+                                            <div
+                                                className="h-full rounded-md transition-all duration-300"
+                                                style={{
+                                                    width: `${(item.users / maxTrafficUsers) * 100}%`,
+                                                    backgroundColor: "#2563eb",
+                                                    opacity,
+                                                }}
+                                            />
+                                        </div>
+                                        <span className="shrink-0 text-right text-sm font-bold tabular-nums text-black whitespace-nowrap">
+                                            {item.users.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
             </section>
+
+            {segment !== "panel" && (
+                <section className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative">
+                    {/* SECCIÓN 3 — Engagement por fuente */}
+                    <InfoTooltip
+                        title="Calidad del tráfico"
+                        measure="Engagement y tiempo de sesión por fuente de tráfico."
+                        calculation="GA4: engagementRate y averageSessionDuration por sessionSource."
+                    />
+                    <div className="flex items-center space-x-3 mb-2">
+                        <div className="p-2 bg-gray-50 rounded-lg">
+                            <BarChart3 className="w-5 h-5 text-black" />
+                        </div>
+                        <div>
+                            <h3 className="chart-title mb-1">
+                                Calidad del tráfico por fuente
+                            </h3>
+                            <p className="text-gray-400 text-xs mb-6">
+                                Engagement rate y duración promedio
+                            </p>
+                        </div>
+                    </div>
+
+                    {loading ? (
+                        <div className="h-48 bg-gray-50 animate-pulse rounded-2xl" />
+                    ) : engagementSorted.length === 0 ? (
+                        <p className="text-sm text-gray-400">
+                            Sin datos de engagement para este período
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto rounded-xl border border-gray-100">
+                            <table className="w-full text-left min-w-[480px]">
+                                <thead>
+                                    <tr className="border-b border-gray-100 bg-gray-50/80">
+                                        <th className="py-3 px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                            Fuente
+                                        </th>
+                                        <th className="py-3 px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">
+                                            Engagement
+                                        </th>
+                                        <th className="py-3 px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">
+                                            Duración prom
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {engagementSorted.map((row, i) => {
+                                        const pct = engagementPct(
+                                            row.engagementRate,
+                                        );
+                                        const badge = engagementBadge(
+                                            row.engagementRate,
+                                        );
+                                        return (
+                                            <tr
+                                                key={`eng-${row.source}-${i}`}
+                                                className="hover:bg-gray-50/50"
+                                            >
+                                                <td className="py-3 px-3 text-sm font-medium text-black break-words max-w-[200px]">
+                                                    {row.label}
+                                                </td>
+                                                <td className="py-3 px-3 text-right">
+                                                    <div className="flex items-center justify-end gap-2 flex-wrap">
+                                                        <span className="text-sm font-bold tabular-nums text-black">
+                                                            {pct.toFixed(1)}%
+                                                        </span>
+                                                        <span
+                                                            className={`inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded ${badge.className}`}
+                                                        >
+                                                            {badge.label}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-3 text-sm font-semibold text-black text-right tabular-nums whitespace-nowrap">
+                                                    {formatDuration(
+                                                        row.avgDuration,
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
+            )}
         </div>
     );
 }
-
-

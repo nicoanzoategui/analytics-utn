@@ -1,12 +1,16 @@
 "use client";
 
-import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip, Legend, XAxis, YAxis } from "recharts";
-import { COLOR_HIGHLIGHT, COLOR_BAR_REST } from "@/lib/chartColors";
+import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function BrowsersBarChart({ data, loading }) {
     if (loading) {
         return <div className="h-[300px] w-full bg-gray-50 animate-pulse rounded-2xl" />;
     }
+
+    const maxVal = Math.max(
+        ...data.map((d) => d.users || d.value || d.activeUsers || 0),
+        0
+    );
 
     return (
         <div className="h-[300px] w-full mt-4">
@@ -41,9 +45,19 @@ export default function BrowsersBarChart({ data, loading }) {
                         animationDuration={1500}
                         label={{ position: 'right', fontSize: 10, fontWeight: 'bold', fill: '#9CA3AF', formatter: (val) => val.toLocaleString() }}
                     >
-                        {data.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={index === 0 ? COLOR_HIGHLIGHT : COLOR_BAR_REST} />
-                        ))}
+                        {data.map((entry, index) => {
+                            const val =
+                                entry.users || entry.value || entry.activeUsers || 0;
+                            const opacity =
+                                maxVal > 0 ? 0.2 + (val / maxVal) * 0.8 : 0.2;
+                            return (
+                                <Cell
+                                    key={`cell-${index}`}
+                                    fill="#2563eb"
+                                    fillOpacity={opacity}
+                                />
+                            );
+                        })}
                     </Bar>
                 </BarChart>
             </ResponsiveContainer>

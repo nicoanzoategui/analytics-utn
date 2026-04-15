@@ -50,65 +50,100 @@ export async function GET(request) {
 
     const client = getGA4Client(session.accessToken);
 
+    const eventOnCarreraLandingFilter = (eventName) => ({
+        andGroup: {
+            expressions: [
+                {
+                    filter: {
+                        fieldName: "pagePath",
+                        stringFilter: {
+                            matchType: "BEGINS_WITH",
+                            value: "/e-learning/detalle/carrera/",
+                        },
+                    },
+                },
+                {
+                    filter: {
+                        fieldName: "eventName",
+                        stringFilter: {
+                            matchType: "EXACT",
+                            value: eventName,
+                        },
+                    },
+                },
+            ],
+        },
+    });
+
     const getMetricsForRange = async (range) => {
-        const [pageRes, clickRes] = await Promise.all([
+        const [pageRes, inscripcionRes, whatsappRes] = await Promise.all([
             client.runReport({
                 property: `properties/${GA4_PROPERTY_ID}`,
                 dateRanges: [range],
                 metrics: [
                     { name: "screenPageViews" },
-                    { name: "averageSessionDuration" }
+                    { name: "activeUsers" },
+                    { name: "averageSessionDuration" },
                 ],
                 dimensionFilter: {
                     filter: {
                         fieldName: "pagePath",
                         stringFilter: {
                             matchType: "BEGINS_WITH",
-                            value: "/e-learning/detalle/carrera/"
-                        }
-                    }
-                }
+                            value: "/e-learning/detalle/carrera/",
+                        },
+                    },
+                },
             }),
             client.runReport({
                 property: `properties/${GA4_PROPERTY_ID}`,
                 dateRanges: [range],
-                metrics: [
-                    { name: "eventCount" }
-                ],
-                dimensionFilter: {
-                    andGroup: {
-                        expressions: [
-                            {
-                                filter: {
-                                    fieldName: "pagePath",
-                                    stringFilter: {
-                                        matchType: "BEGINS_WITH",
-                                        value: "/e-learning/detalle/carrera/"
-                                    }
-                                }
-                            },
-                            {
-                                filter: {
-                                    fieldName: "eventName",
-                                    stringFilter: {
-                                        matchType: "EXACT",
-                                        value: "click_inscription"
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                }
-            })
+                metrics: [{ name: "eventCount" }],
+                dimensionFilter: eventOnCarreraLandingFilter("click_inscription"),
+            }),
+            client.runReport({
+                property: `properties/${GA4_PROPERTY_ID}`,
+                dateRanges: [range],
+                metrics: [{ name: "eventCount" }],
+                dimensionFilter: eventOnCarreraLandingFilter(
+                    "chatbot_open_whatsapp",
+                ),
+            }),
         ]);
 
-        const pageRow = pageRes[0].rows?.[0] || { metricValues: [{value: "0"}, {value: "0"}] };
-        const clickRow = clickRes[0].rows?.[0] || { metricValues: [{value: "0"}] };
+        const pageRow = pageRes[0].rows?.[0] || {
+            metricValues: [
+                { value: "0" },
+                { value: "0" },
+                { value: "0" },
+            ],
+        };
+        const inscripcionRow =
+            inscripcionRes[0].rows?.[0] || { metricValues: [{ value: "0" }] };
+        const whatsappRow =
+            whatsappRes[0].rows?.[0] || { metricValues: [{ value: "0" }] };
+
+        const views = parseInt(pageRow.metricValues[0].value || "0", 10);
+        const users = parseInt(pageRow.metricValues[1].value || "0", 10);
+        const duration = parseFloat(pageRow.metricValues[2].value || "0");
+        const clicks_inscription = parseInt(
+            inscripcionRow.metricValues[0].value || "0",
+            10,
+        );
+        const clicks_whatsapp = parseInt(
+            whatsappRow.metricValues[0].value || "0",
+            10,
+        );
+        const clicks = clicks_inscription + clicks_whatsapp;
 
         return {
-            views: parseInt(pageRow.metricValues[0].value || "0"),
-            duration: parseFloat(pageRow.metricValues[1].value || "0"),
-            clicks: parseInt(clickRow.metricValues[0].value || "0")
+            views,
+            users,
+            duration,
+            clicks_inscription,
+            clicks_whatsapp,
+            clicks,
+            conversion: users > 0 ? (clicks / users) * 100 : 0,
         };
     };
 
@@ -119,16 +154,8 @@ export async function GET(request) {
         ]);
 
         const data = {
-            old: {
-                ...oldMetrics,
-                conversion: oldMetrics.views > 0 ? (oldMetrics.clicks / oldMetrics.views) * 100 : 0,
-                range: rangeOld
-            },
-            new: {
-                ...newMetrics,
-                conversion: newMetrics.views > 0 ? (newMetrics.clicks / newMetrics.views) * 100 : 0,
-                range: rangeNew
-            }
+            old: { ...oldMetrics, range: rangeOld },
+            new: { ...newMetrics, range: rangeNew },
         };
 
         return NextResponse.json(data);

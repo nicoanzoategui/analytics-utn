@@ -7,12 +7,11 @@ import TabResumen from "@/components/tabs/TabResumen";
 import TabComportamiento from "@/components/tabs/TabComportamiento";
 import TabContenido from "@/components/tabs/TabContenido";
 import TabRetencion from "@/components/tabs/TabRetencion";
-import TabConversiones from "@/components/tabs/TabConversiones";
 
 
 export default function DashboardPage() {
     const [dateRange, setDateRange] = useState({ days: 7, startDate: null, endDate: null });
-    const [segment, setSegment] = useState("all");
+    const [segment, setSegment] = useState("public");
     const [activeTab, setActiveTab] = useState("resumen");
 
     const tabs = [
@@ -20,7 +19,6 @@ export default function DashboardPage() {
         { id: "comportamiento", label: "Comportamiento" },
         { id: "contenido", label: "Contenido" },
         { id: "retencion", label: "Retención" },
-        { id: "conversiones", label: "Conversiones" },
     ];
 
 
@@ -60,7 +58,6 @@ export default function DashboardPage() {
                 {activeTab === "comportamiento" && <TabComportamiento {...dateRange} segment={segment} />}
                 {activeTab === "contenido" && <TabContenido {...dateRange} segment={segment} />}
                 {activeTab === "retencion" && <TabRetencion {...dateRange} segment={segment} />}
-                {activeTab === "conversiones" && <TabConversiones {...dateRange} segment={segment} />}
 
             </div>
         </div>

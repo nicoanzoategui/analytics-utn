@@ -4,6 +4,19 @@ import { getGA4Client, GA4_PROPERTY_ID, getRealtimeSegmentFilter } from "@/lib/g
 
 import { NextResponse } from "next/server";
 
+function headerIndex(headers, name) {
+    if (!headers?.length) return -1;
+    return headers.findIndex((h) => h?.name === name);
+}
+
+function rowDimensionValues(row) {
+    return row.dimensionValues ?? row.dimension_values ?? [];
+}
+
+function rowMetricValues(row) {
+    return row.metricValues ?? row.metric_values ?? [];
+}
+
 export async function GET(request) {
     const session = await getServerSession(authOptions);
 
@@ -18,41 +31,92 @@ export async function GET(request) {
     const dimensionFilter = getRealtimeSegmentFilter(segment);
 
     try {
+        const baseDimensions = [
+            { name: "country" },
+            { name: "countryId" },
+        ];
+
+        if (dimensionFilter) {
+            baseDimensions.push({ name: "unifiedScreenName" });
+        }
+
         const gaRequest = {
             property: `properties/${GA4_PROPERTY_ID}`,
             metrics: [{ name: "activeUsers" }],
-            dimensions: [{ name: "country" }] // We always want country for the sidebar table
+            dimensions: baseDimensions,
         };
 
         if (dimensionFilter) {
             gaRequest.dimensionFilter = dimensionFilter;
-            // Realtime API requires dimensions we filter on to be in 'dimensions' too?
-            // Actually no, but for multi-segment we might need pagePath in dimensions.
-            // Let's keep it simple: filter by panel if requested.
         }
 
         const [response] = await client.runRealtimeReport(gaRequest);
 
         const rows = response.rows || [];
-        
-        // Extract countries and total users from rows
-        const countries = rows.map(row => ({
-            name: row.dimensionValues[0]?.value || "Desconocido",
-            activeUsers: parseInt(row.metricValues[0]?.value || "0")
-        })).sort((a, b) => b.activeUsers - a.activeUsers);
+        const dimHeaders =
+            response.dimensionHeaders ?? response.dimension_headers ?? [];
+        const metricHeaders =
+            response.metricHeaders ?? response.metric_headers ?? [];
 
-        const activeUsers = countries.reduce((acc, c) => acc + c.activeUsers, 0);
+        const countryIdx = headerIndex(dimHeaders, "country");
+        const countryIdIdx = headerIndex(dimHeaders, "countryId");
+        const activeUsersIdx = headerIndex(metricHeaders, "activeUsers");
+        const metricCol =
+            activeUsersIdx >= 0 ? activeUsersIdx : 0;
 
-        // If no rows, we might need a separate call for total 0
-        // (but standard GA4 returns rows for existing users)
+        const countries = rows.map((row) => {
+                const dims = rowDimensionValues(row);
+                const metrics = rowMetricValues(row);
 
-        return NextResponse.json({ 
-            activeUsers, 
-            countries: countries.slice(0, 10) // Top 10 countries
+                const name =
+                    countryIdx >= 0
+                        ? (dims[countryIdx]?.value ?? "").trim()
+                        : (dims[0]?.value ?? "").trim();
+                const iso =
+                    countryIdIdx >= 0
+                        ? (dims[countryIdIdx]?.value ?? "").trim()
+                        : "";
+
+                const country =
+                    name || iso || "Desconocido";
+
+                const activeUsers = parseInt(
+                    metrics[metricCol]?.value ?? "0",
+                    10
+                );
+
+                return { country, activeUsers };
+            });
+
+        const grouped = countries.reduce((acc, row) => {
+            const existing = acc.find((c) => c.country === row.country);
+            if (existing) {
+                existing.activeUsers += row.activeUsers;
+            } else {
+                acc.push({ ...row });
+            }
+            return acc;
+        }, []);
+
+        const sorted = grouped
+            .filter((c) => c.country && c.country !== "Desconocido" || c.activeUsers > 0)
+            .sort((a, b) => b.activeUsers - a.activeUsers);
+
+        const activeUsers = sorted.reduce((acc, c) => acc + c.activeUsers, 0);
+
+        return NextResponse.json({
+            activeUsers,
+            countries: sorted.slice(0, 10),
         });
 
     } catch (error) {
         console.error("GA4 Realtime Error:", error);
+        console.error("GA4 Realtime Error DETALLE:", {
+            message: error.message,
+            code: error.code,
+            status: error.status,
+            details: JSON.stringify(error.details || error.errors || {}),
+        });
         // Fallback to total users only if country dimension fails for some reason
         try {
             const [totalOnlyRes] = await client.runRealtimeReport({

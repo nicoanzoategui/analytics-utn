@@ -1,14 +1,13 @@
 "use client";
 import InfoTooltip from "./InfoTooltip";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { COLOR_HIGHLIGHT, COLOR_BAR_REST } from '@/lib/chartColors';
 
 export default function HourlyTrafficChart({ data, peaks, loading }) {
     if (loading) {
         return <div className="h-80 bg-white p-8 rounded-3xl border border-gray-100 animate-pulse" />;
     }
 
-    const maxVal = Math.max(...data.map(d => d.activeUsers), 0);
+    const maxVal = Math.max(...data.map((d) => d.users), 0);
 
     return (
         <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative">
@@ -44,13 +43,19 @@ export default function HourlyTrafficChart({ data, peaks, loading }) {
                             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                         />
                         <Bar dataKey="users" radius={[4, 4, 0, 0]}>
-                            {data.map((entry, index) => (
-                                <Cell
-                                    key={`cell-${index}`}
-                                    fill={peaks?.includes(entry.hour) ? COLOR_HIGHLIGHT : COLOR_BAR_REST}
-                                    className="transition-all duration-300"
-                                />
-                            ))}
+                            {data.map((entry, index) => {
+                                const val = entry.users ?? 0;
+                                const opacity =
+                                    maxVal > 0 ? 0.2 + (val / maxVal) * 0.8 : 0.2;
+                                return (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill="#2563eb"
+                                        fillOpacity={opacity}
+                                        className="transition-all duration-300"
+                                    />
+                                );
+                            })}
                         </Bar>
                     </BarChart>
                 </ResponsiveContainer>

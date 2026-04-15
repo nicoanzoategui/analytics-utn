@@ -2,7 +2,6 @@
 
 export default function SegmentSelector({ value, onChange }) {
     const options = [
-        { label: "Ambos", value: "all" },
         { label: "Web pública", value: "public" },
         { label: "Panel del alumno", value: "panel" },
     ];
