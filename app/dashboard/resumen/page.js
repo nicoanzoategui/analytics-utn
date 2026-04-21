@@ -11,6 +11,7 @@ import {
     Globe,
     Users,
 } from "lucide-react";
+import { getComparisonRange } from "@/lib/comparison-range";
 
 const DAY_ABBR_ES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -26,6 +27,20 @@ function formatDurationShort(sec) {
     const m = Math.floor(s / 60);
     const r = Math.floor(s % 60);
     return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
+/** Fechas YYYY-MM-DD o relativo GA → texto legible (es-AR). */
+function formatDateEsLabel(isoOrRelative) {
+    if (!isoOrRelative || typeof isoOrRelative !== "string") return "—";
+    if (isoOrRelative.includes("daysAgo")) return isoOrRelative;
+    const [y, m, d] = isoOrRelative.split("-").map(Number);
+    if (!y || !m || !d) return isoOrRelative;
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString("es-AR", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
 }
 
 function pctChange(cur, prev) {
@@ -461,6 +476,11 @@ export default function ResumenEjecutivoPage() {
         return Math.max(0, Math.min(100, 100 - n));
     }, [resumenPanel]);
 
+    const comparisonPeriod = useMemo(() => {
+        if (!startDate || !endDate) return null;
+        return getComparisonRange(startDate, endDate);
+    }, [startDate, endDate]);
+
     async function handleCopySlack() {
         if (!hasReport) return;
         const text = buildSlackSummary({
@@ -564,9 +584,37 @@ export default function ResumenEjecutivoPage() {
                 <h1 className="text-2xl font-black tracking-tight text-black mb-2">
                     Resumen Ejecutivo
                 </h1>
-                <p className="text-gray-500 text-sm mb-6">
+                <p className="text-gray-500 text-sm mb-2">
                     Rango personalizado · Web pública + Panel del alumno
                 </p>
+                {hasReport && comparisonPeriod && (
+                    <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                            Períodos del análisis
+                        </p>
+                        <p>
+                            <span className="text-gray-500">Período seleccionado:</span>{" "}
+                            <span className="font-medium text-gray-900">
+                                {formatDateEsLabel(startDate)} –{" "}
+                                {formatDateEsLabel(endDate)}
+                            </span>
+                        </p>
+                        <p className="mt-1.5">
+                            <span className="text-gray-500">
+                                Comparación (para % vs anterior):
+                            </span>{" "}
+                            <span className="font-medium text-gray-900">
+                                {formatDateEsLabel(comparisonPeriod.startDate)} –{" "}
+                                {formatDateEsLabel(comparisonPeriod.endDate)}
+                            </span>
+                            <span className="text-gray-400">
+                                {" "}
+                                · Misma cantidad de días, inmediatamente
+                                anterior
+                            </span>
+                        </p>
+                    </div>
+                )}
 
                 <div className="no-print flex flex-wrap items-center gap-2 mb-4">
                     {[
@@ -674,9 +722,9 @@ export default function ResumenEjecutivoPage() {
                                                 ?.value ?? 0
                                         ).toLocaleString()}
                                     </p>
-                                    <div className="flex items-center gap-2 mb-4">
+                                    <div className="flex flex-wrap items-center gap-2 mb-4">
                                         <span className="text-xs uppercase tracking-widest text-gray-400">
-                                            vs período prev.
+                                            vs período anterior
                                         </span>
                                         <Variation
                                             cur={
@@ -726,9 +774,9 @@ export default function ResumenEjecutivoPage() {
                                                 ?.value ?? 0
                                         ).toLocaleString()}
                                     </p>
-                                    <div className="flex items-center gap-2 mb-4">
+                                    <div className="flex flex-wrap items-center gap-2 mb-4">
                                         <span className="text-xs uppercase tracking-widest text-gray-400">
-                                            vs período prev.
+                                            vs período anterior
                                         </span>
                                         <Variation
                                             cur={
