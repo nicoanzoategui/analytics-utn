@@ -18,13 +18,13 @@ export async function GET(request) {
     try {
         console.log(`[Login Detalles API] Fetching login event details for property ${GA4_PROPERTY_ID}`);
 
-        // Query para ver todos los parámetros del evento login
+        // Query simple: evento login por página y fecha
         const [response] = await client.runReport({
             property: `properties/${GA4_PROPERTY_ID}`,
             dateRanges: [{ startDate, endDate }],
             dimensions: [
                 { name: "eventName" },
-                { name: "customEvent:method" }, // método de login
+                { name: "date" },
                 { name: "pagePath" },
             ],
             dimensionFilter: {
@@ -36,21 +36,22 @@ export async function GET(request) {
             metrics: [
                 { name: "eventCount" },
             ],
-            orderBys: [{ metric: { metricName: "eventCount" }, desc: true }],
+            orderBys: [{ dimension: { dimensionName: "date" }, desc: true }],
             limit: 100,
         });
 
         const detalles = (response.rows || []).map((row) => ({
             evento: row.dimensionValues[0]?.value || "",
-            metodo: row.dimensionValues[1]?.value || "(not set)",
+            fecha: row.dimensionValues[1]?.value || "",
             pagina: row.dimensionValues[2]?.value || "",
             total: parseInt(row.metricValues[0]?.value || "0"),
         }));
 
-        console.log(`[Login Detalles API] Found ${detalles.length} login variations`);
+        console.log(`[Login Detalles API] Found ${detalles.length} login events`);
 
         return NextResponse.json({
             detalles,
+            total: detalles.reduce((sum, d) => sum + d.total, 0),
             periodo: { startDate, endDate },
         });
     } catch (error) {
