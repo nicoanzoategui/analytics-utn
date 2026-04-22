@@ -584,37 +584,9 @@ export default function ResumenEjecutivoPage() {
                 <h1 className="text-2xl font-black tracking-tight text-black mb-2">
                     Resumen Ejecutivo
                 </h1>
-                <p className="text-gray-500 text-sm mb-2">
+                <p className="text-gray-500 text-sm mb-6">
                     Rango personalizado · Web pública + Panel del alumno
                 </p>
-                {hasReport && comparisonPeriod && (
-                    <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-                            Períodos del análisis
-                        </p>
-                        <p>
-                            <span className="text-gray-500">Período seleccionado:</span>{" "}
-                            <span className="font-medium text-gray-900">
-                                {formatDateEsLabel(startDate)} –{" "}
-                                {formatDateEsLabel(endDate)}
-                            </span>
-                        </p>
-                        <p className="mt-1.5">
-                            <span className="text-gray-500">
-                                Comparación (para % vs anterior):
-                            </span>{" "}
-                            <span className="font-medium text-gray-900">
-                                {formatDateEsLabel(comparisonPeriod.startDate)} –{" "}
-                                {formatDateEsLabel(comparisonPeriod.endDate)}
-                            </span>
-                            <span className="text-gray-400">
-                                {" "}
-                                · Misma cantidad de días, inmediatamente
-                                anterior
-                            </span>
-                        </p>
-                    </div>
-                )}
 
                 <div className="no-print flex flex-wrap items-center gap-2 mb-4">
                     {[
@@ -701,6 +673,41 @@ export default function ResumenEjecutivoPage() {
                 <>
                     {/* SECCIÓN 1 */}
                     <section className="mb-12">
+                        {comparisonPeriod && (
+                            <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                                    Períodos del análisis
+                                </p>
+                                <p>
+                                    <span className="text-gray-500">
+                                        Período seleccionado:
+                                    </span>{" "}
+                                    <span className="font-medium text-gray-900">
+                                        {formatDateEsLabel(startDate)} –{" "}
+                                        {formatDateEsLabel(endDate)}
+                                    </span>
+                                </p>
+                                <p className="mt-1.5">
+                                    <span className="text-gray-500">
+                                        Período anterior (base del %):
+                                    </span>{" "}
+                                    <span className="font-medium text-gray-900">
+                                        {formatDateEsLabel(
+                                            comparisonPeriod.startDate,
+                                        )}{" "}
+                                        –{" "}
+                                        {formatDateEsLabel(
+                                            comparisonPeriod.endDate,
+                                        )}
+                                    </span>
+                                    <span className="text-gray-400">
+                                        {" "}
+                                        · Misma cantidad de días, el bloque
+                                        inmediatamente anterior
+                                    </span>
+                                </p>
+                            </div>
+                        )}
                         <h2 className="text-xs font-bold uppercase tracking-widest text-gray-400 border-b border-gray-100 pb-3 mb-6">
                             Audiencia
                         </h2>
@@ -716,26 +723,57 @@ export default function ResumenEjecutivoPage() {
                                     </span>
                                 </div>
                                 <div className="p-6">
+                                    {comparisonPeriod &&
+                                        !comparisonPeriod.startDate.includes(
+                                            "daysAgo",
+                                        ) && (
+                                            <p className="text-[11px] text-gray-500 mb-2 leading-snug">
+                                                <span className="font-medium text-gray-700">
+                                                    Período:
+                                                </span>{" "}
+                                                {formatDateEsLabel(startDate)} –{" "}
+                                                {formatDateEsLabel(endDate)}
+                                            </p>
+                                        )}
                                     <p className="text-3xl font-black text-black tracking-tight tabular-nums mb-1">
                                         {(
                                             resumenPublic?.activeUsers
                                                 ?.value ?? 0
                                         ).toLocaleString()}
                                     </p>
-                                    <div className="flex flex-wrap items-center gap-2 mb-4">
-                                        <span className="text-xs uppercase tracking-widest text-gray-400">
-                                            vs período anterior
-                                        </span>
-                                        <Variation
-                                            cur={
-                                                resumenPublic?.activeUsers
-                                                    ?.value
-                                            }
-                                            prev={
-                                                resumenPublic?.activeUsers
-                                                    ?.prevValue
-                                            }
-                                        />
+                                    <div className="mb-4">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-xs uppercase tracking-widest text-gray-400">
+                                                vs período anterior
+                                            </span>
+                                            <Variation
+                                                cur={
+                                                    resumenPublic?.activeUsers
+                                                        ?.value
+                                                }
+                                                prev={
+                                                    resumenPublic?.activeUsers
+                                                        ?.prevValue
+                                                }
+                                            />
+                                        </div>
+                                        {comparisonPeriod &&
+                                            !comparisonPeriod.startDate.includes(
+                                                "daysAgo",
+                                            ) && (
+                                                <p className="text-[11px] text-gray-500 mt-1.5 leading-snug">
+                                                    Ese % compara con{" "}
+                                                    <span className="font-medium text-gray-800">
+                                                        {formatDateEsLabel(
+                                                            comparisonPeriod.startDate,
+                                                        )}{" "}
+                                                        –{" "}
+                                                        {formatDateEsLabel(
+                                                            comparisonPeriod.endDate,
+                                                        )}
+                                                    </span>
+                                                </p>
+                                            )}
                                     </div>
                                     <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">
                                         Tasa engagement
@@ -768,26 +806,57 @@ export default function ResumenEjecutivoPage() {
                                     </span>
                                 </div>
                                 <div className="p-6">
+                                    {comparisonPeriod &&
+                                        !comparisonPeriod.startDate.includes(
+                                            "daysAgo",
+                                        ) && (
+                                            <p className="text-[11px] text-gray-500 mb-2 leading-snug">
+                                                <span className="font-medium text-gray-700">
+                                                    Período:
+                                                </span>{" "}
+                                                {formatDateEsLabel(startDate)} –{" "}
+                                                {formatDateEsLabel(endDate)}
+                                            </p>
+                                        )}
                                     <p className="text-3xl font-black text-black tracking-tight tabular-nums mb-1">
                                         {(
                                             resumenPanel?.activeUsers
                                                 ?.value ?? 0
                                         ).toLocaleString()}
                                     </p>
-                                    <div className="flex flex-wrap items-center gap-2 mb-4">
-                                        <span className="text-xs uppercase tracking-widest text-gray-400">
-                                            vs período anterior
-                                        </span>
-                                        <Variation
-                                            cur={
-                                                resumenPanel?.activeUsers
-                                                    ?.value
-                                            }
-                                            prev={
-                                                resumenPanel?.activeUsers
-                                                    ?.prevValue
-                                            }
-                                        />
+                                    <div className="mb-4">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-xs uppercase tracking-widest text-gray-400">
+                                                vs período anterior
+                                            </span>
+                                            <Variation
+                                                cur={
+                                                    resumenPanel?.activeUsers
+                                                        ?.value
+                                                }
+                                                prev={
+                                                    resumenPanel?.activeUsers
+                                                        ?.prevValue
+                                                }
+                                            />
+                                        </div>
+                                        {comparisonPeriod &&
+                                            !comparisonPeriod.startDate.includes(
+                                                "daysAgo",
+                                            ) && (
+                                                <p className="text-[11px] text-gray-500 mt-1.5 leading-snug">
+                                                    Ese % compara con{" "}
+                                                    <span className="font-medium text-gray-800">
+                                                        {formatDateEsLabel(
+                                                            comparisonPeriod.startDate,
+                                                        )}{" "}
+                                                        –{" "}
+                                                        {formatDateEsLabel(
+                                                            comparisonPeriod.endDate,
+                                                        )}
+                                                    </span>
+                                                </p>
+                                            )}
                                     </div>
                                     <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">
                                         % recurrentes

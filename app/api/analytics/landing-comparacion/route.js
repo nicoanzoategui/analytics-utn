@@ -3,6 +3,22 @@ import { authOptions } from "../../auth/[...nextauth]/route";
 import { getGA4Client, GA4_PROPERTY_ID } from "@/lib/ga-api";
 import { NextResponse } from "next/server";
 
+/** Alineado con la UI: métricas solo en URLs de detalle de carrera (variantes de path en GA4). */
+const CARRERA_PATH_SUBSTRING = "/e-learning/detalle/carrera";
+
+const INSCRIPTION_EVENT_NAMES = ["click_inscription"];
+
+function sumEventCountForCarreraPaths(rows, pathSubstring = CARRERA_PATH_SUBSTRING) {
+    let total = 0;
+    const needle = pathSubstring.toLowerCase();
+    for (const row of rows || []) {
+        const path = (row.dimensionValues?.[0]?.value || "").toLowerCase();
+        if (!path.includes(needle)) continue;
+        total += parseInt(row.metricValues?.[0]?.value || "0", 10);
+    }
+    return total;
+}
+
 export async function GET(request) {
     const session = await getServerSession(authOptions);
 
@@ -98,8 +114,20 @@ export async function GET(request) {
             client.runReport({
                 property: `properties/${GA4_PROPERTY_ID}`,
                 dateRanges: [range],
+                dimensions: [{ name: "pagePath" }],
                 metrics: [{ name: "eventCount" }],
-                dimensionFilter: eventOnCarreraLandingFilter("click_inscription"),
+                dimensionFilter: {
+                    filter: {
+                        fieldName: "eventName",
+                        stringFilter: {
+                            matchType: "IN_LIST",
+                            inListFilter: {
+                                values: INSCRIPTION_EVENT_NAMES,
+                            },
+                        },
+                    },
+                },
+                limit: 100000,
             }),
             client.runReport({
                 property: `properties/${GA4_PROPERTY_ID}`,
@@ -118,17 +146,14 @@ export async function GET(request) {
                 { value: "0" },
             ],
         };
-        const inscripcionRow =
-            inscripcionRes[0].rows?.[0] || { metricValues: [{ value: "0" }] };
         const whatsappRow =
             whatsappRes[0].rows?.[0] || { metricValues: [{ value: "0" }] };
 
         const views = parseInt(pageRow.metricValues[0].value || "0", 10);
         const users = parseInt(pageRow.metricValues[1].value || "0", 10);
         const duration = parseFloat(pageRow.metricValues[2].value || "0");
-        const clicks_inscription = parseInt(
-            inscripcionRow.metricValues[0].value || "0",
-            10,
+        const clicks_inscription = sumEventCountForCarreraPaths(
+            inscripcionRes[0].rows,
         );
         const clicks_whatsapp = parseInt(
             whatsappRow.metricValues[0].value || "0",
