@@ -19,7 +19,11 @@ export async function GET(request) {
     const dimensionFilter = getSegmentFilter(segment);
 
     try {
-        console.log(`[Resumen API] Fetching GA4 data for property ${GA4_PROPERTY_ID}. Segment: ${segment}, Range: [${startDate}, ${endDate}], Prev: [${prevStartDate}, ${prevEndDate}]`);
+        console.log(`[Resumen API] Fetching GA4 data for property ${GA4_PROPERTY_ID}`);
+        console.log(`[Resumen API] Segment: ${segment}`);
+        console.log(`[Resumen API] Range: [${startDate}, ${endDate}]`);
+        console.log(`[Resumen API] Prev: [${prevStartDate}, ${prevEndDate}]`);
+        console.log(`[Resumen API] DimensionFilter:`, JSON.stringify(dimensionFilter, null, 2));
 
         const [response] = await client.runReport({
             property: `properties/${GA4_PROPERTY_ID}`,
@@ -40,6 +44,7 @@ export async function GET(request) {
 
         const rows = response.rows || [];
         console.log(`[Resumen API] GA4 response rows length: ${rows.length}`);
+        console.log(`[Resumen API] First row sample:`, JSON.stringify(rows[0], null, 2));
 
         const currentRows = rows.filter((row) =>
             row.dimensionValues?.some((d) => d.value === "date_range_0")
@@ -72,6 +77,9 @@ export async function GET(request) {
 
         const currentData = parseMetrics(currentM);
         const prevData = parseMetrics(previousM);
+
+        console.log(`[Resumen API] Current activeUsers: ${currentData.activeUsers}`);
+        console.log(`[Resumen API] Previous activeUsers: ${prevData.activeUsers}`);
 
         const data = {
             activeUsers: { value: currentData.activeUsers, prevValue: prevData.activeUsers },
