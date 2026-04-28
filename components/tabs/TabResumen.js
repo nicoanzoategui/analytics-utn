@@ -231,7 +231,7 @@ export default function TabResumen({ days, segment, startDate: customStartDate, 
                     <div className="bg-black p-8 rounded-3xl border border-zinc-800 shadow-xl relative">
                         <InfoTooltip 
                             title="Tarjeta tiempo real"
-                            measure="Usuarios navegando la plataforma en los últimos 30 minutos."
+                            measure="Usuarios activos en ventana reciente de GA4. Con vista «público» o «panel», el número es del sitio completo: la API de tiempo real no permite filtrar por ruta como los reportes históricos."
                             calculation="GA4 runRealtimeReport → métrica activeUsers. Se actualiza cada 30 segundos."
                         />
                         <div className="flex items-center justify-between mb-8">
@@ -258,6 +258,11 @@ export default function TabResumen({ days, segment, startDate: customStartDate, 
                                     <Activity className="w-4 h-4" />
                                     <span className="text-[10px] uppercase font-bold tracking-widest">usuarios activos</span>
                                 </div>
+                                {(segment === "panel" || segment === "public") && (
+                                    <p className="text-[10px] text-zinc-500 mt-3 leading-relaxed">
+                                        Incluye todo el sitio: GA4 no expone filtro por ruta en tiempo real (los KPI de arriba sí usan `/panel/`).
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
